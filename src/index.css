@@ -1,0 +1,58 @@
+/* Level Up Learning – autism-friendly, high contrast, game-based */
+:root {
+  font-family: "Nunito", "Segoe UI", system-ui, sans-serif;
+  line-height: 1.5;
+  font-weight: 600;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+
+  /* High contrast for visibility */
+  --text-primary: #1a1a1a;
+  --text-secondary: #333333;
+  --text-muted: #444444;
+  --bg-page: #f5ebe0;
+  --bg-card: #ffffff;
+  --border-strong: #2d2d2d;
+  --accent-green: #1e8449;
+  --accent-blue: #1a5276;
+  --accent-orange: #b45f06;
+  --accent-purple: #6c3483;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-width: 320px;
+  min-height: 100vh;
+  color: var(--text-primary);
+  background-color: var(--bg-page);
+}
+
+/* All text and headings – dark and bold for visibility */
+h1, h2, h3, p, span, label, button {
+  color: var(--text-primary);
+}
+
+h1 { font-size: clamp(1.5rem, 4vw, 2.2rem); font-weight: 800; }
+h2 { font-size: clamp(1.2rem, 3vw, 1.6rem); font-weight: 700; }
+p, span { color: var(--text-secondary); font-weight: 600; }
+
+button {
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+a {
+  font-weight: 600;
+  color: var(--accent-blue);
+}
+
+/* Ensure inputs and cards have dark text */
+input, select, textarea {
+  color: var(--text-primary);
+  font-weight: 600;
+}
