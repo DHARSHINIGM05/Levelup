@@ -7,6 +7,7 @@ const MODULE_COLORS = {
   speaking: '#3498DB',
   reading: '#E67E22',
   writing: '#9B59B6',
+  analytics: '#8E44AD',
 };
 
 const navStyle = {
@@ -50,6 +51,7 @@ export default function Navbar() {
       <NavLinkStyled to="/speaking" label="Speaking" color={MODULE_COLORS.speaking} />
       <NavLinkStyled to="/reading" label="Reading" color={MODULE_COLORS.reading} />
       <NavLinkStyled to="/writing" label="Writing" color={MODULE_COLORS.writing} />
+      <NavLinkStyled to="/analytics" label="Analytics" color={MODULE_COLORS.analytics} />
     </nav>
   );
 }

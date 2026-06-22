@@ -12,6 +12,9 @@ import Reading from './pages/Reading';
 import ReadingActivity from './pages/ReadingActivity';
 import Writing from './pages/Writing';
 import WritingActivity from './pages/WritingActivity';
+import Analytics from './pages/Analytics';
+import diagram from './components/diagram';
+
 
 function ProtectedLayout() {
   const { isLoggedIn } = useApp();
@@ -44,6 +47,9 @@ function AppRoutes() {
       <Route path="/writing" element={<ProtectedLayout />}>
         <Route index element={<Writing />} />
         <Route path="play" element={<WritingActivity />} />
+      </Route>
+      <Route path="/analytics" element={<ProtectedLayout />}>
+        <Route index element={<Analytics />} />
       </Route>
       <Route path="*" element={<Navigate to="/login" replace />} />
     </Routes>

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useApp } from '../context/AppContext';
 import { speak, playConfirmationTone } from '../utils/voice';
@@ -7,7 +7,7 @@ import { getValuesListeningContent } from '../data/moralValuesContent';
 import { getModuleDifficulty, getProgress, saveSessionProgress } from '../utils/progress';
 import { unlockBadge } from '../utils/rewards';
 
-const SESSION_SIZE = 10;
+const SESSION_SIZE = 5;
 
 const styles = {
   card: {
@@ -61,8 +61,12 @@ const styles = {
 export default function ListeningActivity() {
   const navigate = useNavigate();
   const location = useLocation();
-  const { registeredChild } = useApp();
+  const { registeredChild, startSession, endSession } = useApp();
+  const testType = location.state?.testType || 'Practice';
+
   const difficulty = location.state?.difficulty || getModuleDifficulty('listening');
+  const [startedAt] = useState(() => Date.now());
+  const [attemptedQuestions, setAttemptedQuestions] = useState(new Set());
 
   const [pool, setPool] = useState([]);
   const [sessionItems, setSessionItems] = useState([]);
@@ -71,11 +75,17 @@ export default function ListeningActivity() {
   const [clickedId, setClickedId] = useState(null);
   const [sessionDone, setSessionDone] = useState(false);
   const [correctCount, setCorrectCount] = useState(0);
+  const [canGoNext, setCanGoNext] = useState(false);
+  const analyticsSentRef = useRef(false);
 
   const level = registeredChild?.classType === 'primary' ? 'primary' : 'secondary';
   const grade = registeredChild?.grade ?? 1;
 
   useEffect(() => {
+    const difficulty = location.state?.difficulty || getModuleDifficulty('listening');
+    const testType = location.state?.testType || 'Practice';
+
+    startSession('Listening');
     // Values content: easy = value words, medium = value sentences, hard = moral stories (different content per level)
     const valuesList = getValuesListeningContent(level, grade, difficulty);
     const list = valuesList.length >= SESSION_SIZE ? valuesList : getListeningContentByGrade(level, grade, difficulty);
@@ -88,7 +98,50 @@ export default function ListeningActivity() {
     setSessionDone(false);
     setFeedback(null);
     setCorrectCount(0);
-  }, [level, grade, difficulty]);
+    setCanGoNext(false);
+    analyticsSentRef.current = false;
+    return () => {
+      endSession();
+    };
+  }, [level, grade, difficulty, startSession, endSession]);
+
+  // Send analytics once when session completes; use real session snapshot
+  useEffect(() => {
+    if (!sessionDone || analyticsSentRef.current) return;
+    analyticsSentRef.current = true;
+    const sessionSnapshot = endSession();
+    const total = sessionItems.length;
+    const correct = correctCount;
+    const started = sessionSnapshot.startedAt || startedAt;
+    const durationMinutes = (Date.now() - started) / (1000 * 60);
+    const learnerId = registeredChild
+      ? `${registeredChild.childName || 'child'}_class_${registeredChild.grade || 0}`
+      : 'unknown';
+    if (total > 0) {
+      fetch('http://localhost:4000/api/test-result', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          learnerId,
+          learnerName: registeredChild?.childName || null,
+          moduleName: 'Listening',
+          testType: testType,
+          totalQuestions: total,
+          correctAnswers: correct,
+          sessionDuration: durationMinutes,
+          calmModeActivatedCount: sessionSnapshot.calmModeActivatedCount ?? 0,
+          calmModeResumedCount: sessionSnapshot.calmModeResumedCount ?? 0,
+          inattentiveCount: sessionSnapshot.inattentiveCount ?? 0,
+          isCompleted: true,
+          sessionKey: `listening-${learnerId}-${startedAt}`,
+        }),
+      })
+      .then(res => res.json())
+.then(data => console.log("Saved:", data))
+.catch(err => console.error("Save error:", err));
+      
+    }
+  }, [sessionDone, sessionItems.length, correctCount, startedAt, registeredChild, endSession]);
 
   const current = sessionItems[index];
 
@@ -112,34 +165,72 @@ export default function ListeningActivity() {
     return () => clearTimeout(t1);
   }, [current?.id, sessionDone]);
 
+  
   const handleOptionClick = (optionId) => {
-    if (feedback !== null) return;
     setClickedId(optionId);
+  
     const correct = current.correct_id === optionId;
-    setFeedback(correct ? 'correct' : 'wrong');
+    const questionId = current.id;
+  
+    const isFirstAttempt = !attemptedQuestions.has(questionId);
+  
+    if (isFirstAttempt) {
+      setAttemptedQuestions(prev => new Set(prev).add(questionId));
+  
+      if (correct) {
+        setCorrectCount(prev => prev + 1);
+      }
+    }
+  
     if (correct) {
-      setCorrectCount((c) => c + 1);
+      setFeedback('correct');
+  
       playConfirmationTone();
       speak('Correct! Well done.');
+  
       const nextIndex = index + 1;
+  
       if (nextIndex >= sessionItems.length) {
         setSessionDone(true);
-        saveSessionProgress('listening', difficulty, correctCount + 1, sessionItems.length);
-        const p = getProgress();
-        if (!p.listening?.sessions?.length || p.listening.sessions.length <= 1) unlockBadge(p, 'first_listening');
-        setTimeout(() => speak('You finished this round. Great job!'), 1500);
       } else {
-        setTimeout(() => {
-          setIndex(nextIndex);
-          setFeedback(null);
-          setClickedId(null);
-        }, 2000);
+        setCanGoNext(true);
       }
+  
     } else {
-      const correctOption = current.options.find((o) => o.id === current.correct_id);
-      const correctLabel = correctOption ? correctOption.label : 'the right one';
-      speak(`The correct answer is ${correctLabel}. Let's try again.`);
-      setTimeout(() => { setFeedback(null); setClickedId(null); }, 3500);
+      setFeedback('wrong');
+  
+      const correctOption = current.options.find(
+        (o) => o.id === current.correct_id
+      );
+  
+      speak(`Wrong. Try again.`);
+  
+      // IMPORTANT: allow retry
+      setTimeout(() => {
+        setFeedback(null);
+        setClickedId(null);
+      }, 1500);
+    }
+  };
+  
+  
+     
+  
+     
+      
+        
+  
+ 
+        
+
+  const handleNextQuestion = () => {
+    if (!canGoNext) return;
+    const nextIndex = index + 1;
+    if (nextIndex < sessionItems.length) {
+      setIndex(nextIndex);
+      setFeedback(null);
+      setClickedId(null);
+      setCanGoNext(false);
     }
   };
 
@@ -216,12 +307,21 @@ export default function ListeningActivity() {
               ...(feedback === 'wrong' && opt.id === clickedId && opt.id !== current.correct_id ? styles.wrong : null),
             }}
             onClick={() => handleOptionClick(opt.id)}
-            disabled={feedback !== null}
+            disabled={feedback === 'correct'}
           >
             {opt.label}
           </button>
         ))}
       </div>
+      {feedback === 'correct' && !sessionDone && canGoNext && (
+        <button
+          type="button"
+          style={{ ...styles.done, marginTop: 16 }}
+          onClick={handleNextQuestion}
+        >
+          Next question
+        </button>
+      )}
       {feedback === 'wrong' && (
         <p style={{ marginTop: 16, color: '#1a1a1a', fontWeight: 700 }}>
           The correct answer is: <strong>{current.options.find((o) => o.id === current.correct_id)?.label}</strong>. Try again.

@@ -43,15 +43,19 @@ const styles = {
 };
 
 export default function SpeakingActivity() {
+
   const navigate = useNavigate();
   const location = useLocation();
-  const { registeredChild } = useApp();
+  const { registeredChild, startSession, endSession } = useApp();
+
   const difficulty = location.state?.difficulty || getModuleDifficulty('speaking');
 
-  const [pool, setPool] = useState([]);
+  const [startedAt] = useState(() => Date.now());
+  const [sessionSnapshot, setSessionSnapshot] = useState(null);
+
   const [sessionItems, setSessionItems] = useState([]);
   const [index, setIndex] = useState(0);
-  const [status, setStatus] = useState('idle'); // idle | listening | correct | wrong
+  const [status, setStatus] = useState('idle');
   const [sessionDone, setSessionDone] = useState(false);
   const [correctCount, setCorrectCount] = useState(0);
 
@@ -59,119 +63,258 @@ export default function SpeakingActivity() {
   const grade = registeredChild?.grade ?? 1;
 
   useEffect(() => {
+
+    startSession('Speaking');
+
     const valuesList = getValuesSpeakingContent(level, grade, difficulty);
     const list = getSpeakingContentByGrade(level, grade);
-    const byDiff = list.filter((c) => c.difficulty === difficulty);
-    const source = valuesList.length >= SESSION_SIZE ? valuesList : (byDiff.length >= SESSION_SIZE ? byDiff : list);
+    const byDiff = list.filter(c => c.difficulty === difficulty);
+
+    const source =
+      valuesList.length >= SESSION_SIZE
+        ? valuesList
+        : (byDiff.length >= SESSION_SIZE ? byDiff : list);
+
     const shuffled = [...source].sort(() => Math.random() - 0.5);
-    setSessionItems(shuffled.slice(0, Math.min(SESSION_SIZE, shuffled.length)));
-    setPool(source);
+
+    setSessionItems(shuffled.slice(0, SESSION_SIZE));
     setIndex(0);
     setSessionDone(false);
     setCorrectCount(0);
     setStatus('idle');
+
+    return () => {
+      endSession();
+    };
+
   }, [level, grade, difficulty]);
 
   const current = sessionItems[index];
 
   useEffect(() => {
+
     if (!current || sessionDone) return;
+
     speak('Listen to the word.');
-    const t = setTimeout(() => speak(current.text_for_tts), 2000);
+
+    const t = setTimeout(() => {
+      speak(current.text_for_tts);
+    }, 2000);
+
     return () => clearTimeout(t);
-  }, [current?.id, sessionDone]);
+
+  }, [current, sessionDone]);
 
   const handleTapToSpeak = async () => {
+
     if (!current || status === 'listening') return;
+
     setStatus('listening');
+
     speak('Now say the word.');
+
     const said = await startSpeechRecognition();
-    const expected = (current.text_for_tts || '').trim().toLowerCase();
+
+    const expected = current.text_for_tts.toLowerCase().trim();
+
     const correct = matchSpoken(expected, said);
-    setStatus(correct ? 'correct' : 'wrong');
+
     if (correct) {
-      setCorrectCount((c) => c + 1);
+
+      setCorrectCount(prev => prev + 1);
+
       playConfirmationTone();
-      speak('Correct! You said it right.');
-    } else {
-      speak(`The correct word is ${current.text_for_tts}. Let's try again. Say it after you hear it.`);
+
+      speak('Correct!');
+
+      setStatus('correct');
+
+    }
+    else {
+
+      speak(`Correct word is ${current.text_for_tts}`);
+
+      setStatus('wrong');
     }
   };
 
   const handleNext = () => {
+
     const nextIndex = index + 1;
+
     if (nextIndex >= sessionItems.length) {
+
+      const snapshot = endSession();
+
+      setSessionSnapshot(snapshot);
+
       setSessionDone(true);
-      saveSessionProgress('speaking', difficulty, correctCount, sessionItems.length);
-      speak('You finished this round. Great job!');
-    } else {
+
+      saveSessionProgress(
+        'speaking',
+        difficulty,
+        correctCount,
+        sessionItems.length
+      );
+
+      speak('Session completed');
+
+    }
+    else {
+
       setIndex(nextIndex);
+
       setStatus('idle');
     }
   };
 
   if (!registeredChild) {
+
     return (
       <div style={styles.card}>
-        <p>Please log in first.</p>
-        <button type="button" onClick={() => navigate('/login')}>Go to Login</button>
+        <p>Please login first</p>
+        <button onClick={() => navigate('/login')}>
+          Login
+        </button>
       </div>
     );
   }
 
   if (sessionItems.length === 0) {
+
     return (
       <div style={styles.card}>
-        <p>Loading...</p>
+        Loading...
       </div>
     );
   }
 
   if (sessionDone) {
-    const total = sessionItems.length;
-    const p = getProgress();
-    if (!p.speaking?.sessions?.length || p.speaking.sessions.length <= 1) unlockBadge(p, 'first_speaking');
-    return (
-      <div style={styles.card}>
-        <h2 style={styles.title}>🎉 Great job!</h2>
-        <p style={{ fontSize: '1.2rem', marginBottom: 8 }}>You got <strong>{correctCount} out of {total}</strong> correct.</p>
-        <p style={{ fontSize: '1rem', color: '#555', marginBottom: 24 }}>Level: {difficulty}. Progress is saved.</p>
-        <button type="button" style={styles.done} onClick={() => navigate('/speaking')}>Play again</button>
-        <button type="button" style={{ ...styles.done, background: '#fff', color: '#3498DB', border: '2px solid #3498DB', marginLeft: 12 }} onClick={() => navigate('/speaking')}>Back to Speaking</button>
-      </div>
-    );
-  }
 
-  if (!current) {
+    const total = sessionItems.length;
+
+    const snapshot = sessionSnapshot || {};
+
+    const started = snapshot.startedAt || startedAt;
+
+    const durationMinutes =
+      (Date.now() - started) / 60000;
+
+    const learnerId =
+      `${registeredChild.childName}_${registeredChild.grade}`;
+
+    fetch('http://localhost:4000/api/test-result', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+
+        learnerId,
+
+        learnerName: registeredChild.childName,
+
+        moduleName: 'Speaking',
+
+        testType: 'Practice',
+
+        totalQuestions: total,
+
+        correctAnswers: correctCount,
+
+        sessionDuration: durationMinutes,
+
+        calmModeActivatedCount:
+          snapshot.calmModeActivatedCount || 0,
+
+        calmModeResumedCount:
+          snapshot.calmModeResumedCount || 0,
+
+        inattentiveCount:
+          snapshot.inattentiveCount || 0,
+
+        isCompleted: true,
+
+        sessionKey: `speaking-${learnerId}-${startedAt}`
+      })
+    }).catch(() => {});
+
+    const p = getProgress();
+
+    if (!p.speaking?.sessions?.length)
+      unlockBadge(p, 'first_speaking');
+
     return (
       <div style={styles.card}>
-        <button type="button" style={styles.done} onClick={() => navigate('/speaking')}>Back</button>
+
+        <h2>🎉 Great Job</h2>
+
+        <p>
+          Score: {correctCount} / {total}
+        </p>
+
+        <button
+          style={styles.done}
+          onClick={() => navigate('/speaking')}
+        >
+          Play Again
+        </button>
+
+        <button
+          style={{
+            ...styles.done,
+            marginLeft: 10,
+            background: '#fff',
+            color: '#3498DB',
+            border: '2px solid #3498DB'
+          }}
+          onClick={() => navigate('/dashboard')}
+        >
+          Go Dashboard
+        </button>
+
       </div>
     );
   }
 
   return (
+
     <div style={styles.card}>
-      <p style={{ fontSize: '1rem', color: '#555' }}>Question {index + 1} of {sessionItems.length} (Level: {difficulty})</p>
-      <p style={{ fontSize: '1rem', fontWeight: 700, color: '#3498DB' }}>Correct so far: {correctCount}</p>
-      <h2 style={styles.title}>Hear the word, then say it out loud.</h2>
-      <p style={{ fontSize: '1.2rem', marginBottom: 16 }}>Word: <strong>{current.text_for_tts}</strong></p>
-      <button type="button" style={styles.micButton} onClick={handleTapToSpeak} disabled={status === 'listening'}>
-        {status === 'listening' ? '🎤 Listening...' : '🎤 Tap and speak'}
+
+      <p>
+        Question {index + 1} / {sessionItems.length}
+      </p>
+
+      <p>
+        Correct: {correctCount}
+      </p>
+
+      <h2>
+        Say the word
+      </h2>
+
+      <h3>
+        {current.text_for_tts}
+      </h3>
+
+      <button
+        style={styles.micButton}
+        onClick={handleTapToSpeak}
+      >
+        Speak
       </button>
-      {status === 'correct' && (
-        <p style={{ color: '#2ECC71', fontWeight: 700, marginTop: 16 }}>✓ Correct!</p>
-      )}
-      {status === 'wrong' && (
-        <p style={{ color: '#1a1a1a', fontWeight: 700, marginTop: 16 }}>
-          The correct word is: <strong>{current.text_for_tts}</strong>. Try again or go to next.
-        </p>
-      )}
+
       {(status === 'correct' || status === 'wrong') && (
-        <button type="button" style={{ ...styles.micButton, marginTop: 16, background: '#27AE60' }} onClick={handleNext}>
-          Next word
+
+        <button
+          style={{
+            ...styles.micButton,
+            background: '#27AE60'
+          }}
+          onClick={handleNext}
+        >
+          Next
         </button>
       )}
+
     </div>
   );
 }

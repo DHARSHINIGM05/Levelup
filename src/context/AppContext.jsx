@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState } from 'react';
+import React, { createContext, useContext, useState, useCallback, useRef, useEffect } from 'react';
 
 const AppContext = createContext(null);
 
@@ -24,6 +24,62 @@ export function AppProvider({ children }) {
   const [calmMomentActive, setCalmMomentActive] = useState(false);
   const isLoggedIn = !!registeredChild;
 
+  // Session-level attention + calm metrics (for analytics backend)
+  const [sessionStats, setSessionStats] = useState({
+    activeModule: null,
+    startedAt: null,
+    calmModeActivatedCount: 0,
+    calmModeResumedCount: 0,
+    inattentiveCount: 0,
+  });
+  const sessionStatsRef = useRef(sessionStats);
+  useEffect(() => {
+    sessionStatsRef.current = sessionStats;
+  }, [sessionStats]);
+
+  const startSession = useCallback((moduleName) => {
+    setSessionStats({
+      activeModule: moduleName,
+      startedAt: Date.now(),
+      calmModeActivatedCount: 0,
+      calmModeResumedCount: 0,
+      inattentiveCount: 0,
+    });
+  }, []);
+
+  const incrementInattentive = () => {
+    setSessionStats((s) => ({
+      ...s,
+      inattentiveCount: (s.inattentiveCount || 0) + 1,
+    }));
+  };
+
+  const incrementCalmActivated = () => {
+    setSessionStats((s) => ({
+      ...s,
+      calmModeActivatedCount: (s.calmModeActivatedCount || 0) + 1,
+    }));
+  };
+
+  const incrementCalmResumed = () => {
+    setSessionStats((s) => ({
+      ...s,
+      calmModeResumedCount: (s.calmModeResumedCount || 0) + 1,
+    }));
+  };
+
+  const endSession = useCallback(() => {
+    const snapshot = { ...sessionStatsRef.current };
+    setSessionStats({
+      activeModule: null,
+      startedAt: null,
+      calmModeActivatedCount: 0,
+      calmModeResumedCount: 0,
+      inattentiveCount: 0,
+    });
+    return snapshot;
+  }, []);
+
   return (
     <AppContext.Provider
       value={{
@@ -32,6 +88,13 @@ export function AppProvider({ children }) {
         isLoggedIn,
         calmMomentActive,
         setCalmMomentActive,
+        // session metrics
+        sessionStats,
+        startSession,
+        endSession,
+        incrementInattentive,
+        incrementCalmActivated,
+        incrementCalmResumed,
       }}
     >
       {children}

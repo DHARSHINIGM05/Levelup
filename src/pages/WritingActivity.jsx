@@ -60,8 +60,9 @@ const styles = {
 export default function WritingActivity() {
   const navigate = useNavigate();
   const location = useLocation();
-  const { registeredChild } = useApp();
+  const { registeredChild, startSession, endSession } = useApp();
   const difficulty = location.state?.difficulty || getModuleDifficulty('writing');
+  const [startedAt] = useState(() => Date.now());
   const [pool, setPool] = useState([]);
   const [sessionItems, setSessionItems] = useState([]);
   const [index, setIndex] = useState(0);
@@ -69,11 +70,13 @@ export default function WritingActivity() {
   const [clickedId, setClickedId] = useState(null);
   const [sessionDone, setSessionDone] = useState(false);
   const [correctCount, setCorrectCount] = useState(0);
+  const [canGoNext, setCanGoNext] = useState(false);
 
   const level = registeredChild?.classType === 'primary' ? 'primary' : 'secondary';
   const grade = registeredChild?.grade ?? 1;
 
   useEffect(() => {
+    startSession('Writing');
     const valuesList = getValuesWritingContent(level, grade, difficulty);
     const list = valuesList.length >= SESSION_SIZE ? valuesList : getWritingContentByGrade(level, grade);
     setPool(list);
@@ -82,7 +85,10 @@ export default function WritingActivity() {
     setIndex(0);
     setSessionDone(false);
     setFeedback(null);
-  }, [level, grade, difficulty]);
+    return () => {
+      endSession();
+    };
+  }, [level, grade, difficulty, startSession, endSession]);
 
   const current = sessionItems[index];
 
@@ -110,17 +116,26 @@ export default function WritingActivity() {
         if (!p.writing?.sessions?.length || p.writing.sessions.length <= 1) unlockBadge(p, 'first_writing');
         setTimeout(() => speak('You finished this round. Great job!'), 1500);
       } else {
-        setTimeout(() => {
-          setIndex(nextIndex);
-          setFeedback(null);
-          setClickedId(null);
-        }, 2000);
+        // For autistic children, do not auto-advance.
+        // Show a clear Next Question button so they can move on when ready.
+        setCanGoNext(true);
       }
     } else {
       const correctOption = current.options.find((o) => o.id === current.correct_id);
       const correctLabel = correctOption ? correctOption.label : current.text_for_tts;
       speak(`The correct spelling is ${correctLabel}. Let's try again.`);
       setTimeout(() => { setFeedback(null); setClickedId(null); }, 3500);
+    }
+  };
+
+  const handleNextQuestion = () => {
+    if (!canGoNext) return;
+    const nextIndex = index + 1;
+    if (nextIndex < sessionItems.length) {
+      setIndex(nextIndex);
+      setFeedback(null);
+      setClickedId(null);
+      setCanGoNext(false);
     }
   };
 
@@ -146,6 +161,36 @@ export default function WritingActivity() {
       <div style={styles.card}>
         <h2 style={styles.title}>🎉 Great job!</h2>
         <p style={{ fontSize: '1.1rem', marginBottom: 24 }}>You got {correctCount} out of {sessionItems.length} correct. Progress saved.</p>
+        {(() => {
+          const total = sessionItems.length;
+          const sessionSnapshot = endSession();
+          const started = sessionSnapshot.startedAt || startedAt;
+          const durationMinutes = (Date.now() - started) / (1000 * 60);
+          const learnerId = registeredChild
+            ? `${registeredChild.childName || 'child'}_class_${registeredChild.grade || 0}`
+            : 'unknown';
+          if (total > 0) {
+            fetch('http://localhost:4000/api/test-result', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                learnerId,
+                learnerName: registeredChild?.childName || null,
+                moduleName: 'Writing',
+                testType: 'Practice',
+                totalQuestions: total,
+                correctAnswers: correctCount,
+                sessionDuration: durationMinutes,
+              calmModeActivatedCount: sessionSnapshot.calmModeActivatedCount || 0,
+              calmModeResumedCount: sessionSnapshot.calmModeResumedCount || 0,
+              inattentiveCount: sessionSnapshot.inattentiveCount || 0,
+                isCompleted: true,
+                sessionKey: `writing-${learnerId}-${startedAt}`,
+              }),
+            }).catch(() => {});
+          }
+          return null;
+        })()}
         <button type="button" style={styles.done} onClick={() => {
           setSessionDone(false);
           setIndex(0);
@@ -193,6 +238,15 @@ export default function WritingActivity() {
         <p style={{ marginTop: 16, color: '#1a1a1a', fontWeight: 700 }}>
           The correct spelling is: <strong>{current.options.find((o) => o.id === current.correct_id)?.label}</strong>. Try again.
         </p>
+      )}
+      {feedback === 'correct' && !sessionDone && canGoNext && (
+        <button
+          type="button"
+          style={{ ...styles.done, marginTop: 16 }}
+          onClick={handleNextQuestion}
+        >
+          Next question
+        </button>
       )}
     </div>
   );

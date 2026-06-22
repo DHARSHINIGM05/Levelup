@@ -167,19 +167,27 @@ const styles = {
 };
 
 export default function Layout() {
-  const { registeredChild, calmMomentActive, setCalmMomentActive } = useApp();
+  const {
+    registeredChild,
+    calmMomentActive,
+    setCalmMomentActive,
+    incrementInattentive,
+    incrementCalmActivated,
+    incrementCalmResumed,
+  } = useApp();
   const location = useLocation();
   const path = location.pathname;
 
   const handleInattentive = useCallback(() => {
     speak('You are not alert. Please look at the screen.');
     playConfirmationTone();
+    incrementInattentive();
     const email = registeredChild?.parentEmail;
     const name = registeredChild?.childName;
     if (email && name) {
       notifyParentInattentive(email, name).catch((err) => console.error('Inattentiveness email failed', err));
     }
-  }, [registeredChild]);
+  }, [registeredChild, incrementInattentive]);
 
   useEffect(() => {
     const instruction = pageInstructions[path] || pageInstructions['/home'];
@@ -194,13 +202,21 @@ export default function Layout() {
   }, [registeredChild, calmMomentActive, handleInattentive]);
 
   const handleCalmMomentStart = useCallback(() => {
+    incrementCalmActivated();
     setCalmMomentActive(true);
     speak('Let us take a calm moment. Breathe with the circle. When you are ready, tap I am ready.');
-  }, [setCalmMomentActive]);
+  }, [setCalmMomentActive, incrementCalmActivated]);
 
   return (
     <div style={styles.layout}>
-      {calmMomentActive && <CalmMomentOverlay onReady={() => setCalmMomentActive(false)} />}
+      {calmMomentActive && (
+        <CalmMomentOverlay
+          onReady={() => {
+            incrementCalmResumed();
+            setCalmMomentActive(false);
+          }}
+        />
+      )}
       <Navbar />
       <main style={styles.main}>
         <div style={styles.content}>

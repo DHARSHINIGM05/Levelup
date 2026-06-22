@@ -334,75 +334,76 @@ const SECONDARY_GRADES = [6, 7, 8, 9, 10, 11, 12];
                         style={styles.avatarImage}
                       />
                       <span style={styles.avatarLabel}>{avatar.label}</span>
-                      {/* Class type: Primary (1-5) or Secondary (6-12) */}
-<section aria-label="Select class type" style={styles.formGroup}>
-  <h2 style={styles.sectionTitle}>Class Type</h2>
-  <p style={styles.helperText}>Is your child in primary (1–5) or secondary (6–12)?</p>
-  <div style={styles.classTypeRow}>
-    <button
-      type="button"
-      onClick={() => {
-        setClassType('primary');
-        setGrade(null);
-        speak('Primary class selected. Now choose grade 1 to 5.');
-        playConfirmationTone();
-      }}
-      style={{
-        ...styles.classTypeButton,
-        ...(classType === 'primary' ? styles.classTypeButtonActive : {}),
-      }}
-    >
-      Primary (1–5)
-    </button>
-    <button
-      type="button"
-      onClick={() => {
-        setClassType('secondary');
-        setGrade(null);
-        speak('Secondary class selected. Now choose grade 6 to 12.');
-        playConfirmationTone();
-      }}
-      style={{
-        ...styles.classTypeButton,
-        ...(classType === 'secondary' ? styles.classTypeButtonActive : {}),
-      }}
-    >
-      Secondary (6–12)
-    </button>
-  </div>
-</section>
-
-{/* Grade selection based on class type */}
-{classType && (
-  <section aria-label="Select grade" style={styles.formGroup}>
-    <h2 style={styles.sectionTitle}>
-      {classType === 'primary' ? 'Select Grade (1–5)' : 'Select Grade (6–12)'}
-    </h2>
-    <div style={styles.gradeRow}>
-      {(classType === 'primary' ? PRIMARY_GRADES : SECONDARY_GRADES).map((g) => (
-        <button
-          key={g}
-          type="button"
-          onClick={() => {
-            setGrade(g);
-            speak(`Grade ${g} selected.`);
-            playConfirmationTone();
-          }}
-          style={{
-            ...styles.gradeButton,
-            ...(grade === g ? styles.gradeButtonActive : {}),
-          }}
-        >
-          {g}
-        </button>
-      ))}
-    </div>
-  </section>
-)}
                     </button>
                   ))}
                 </div>
               </section>
+
+              {/* Class type: Primary (1-5) or Secondary (6-12) */}
+              <section aria-label="Select class type" style={styles.formGroup}>
+                <h2 style={styles.sectionTitle}>Class Type</h2>
+                <p style={styles.helperText}>Is your child in primary (1–5) or secondary (6–12)?</p>
+                <div style={styles.classTypeRow}>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setClassType('primary');
+                      setGrade(null);
+                      speak('Primary class selected. Now choose grade 1 to 5.');
+                      playConfirmationTone();
+                    }}
+                    style={{
+                      ...styles.classTypeButton,
+                      ...(classType === 'primary' ? styles.classTypeButtonActive : {}),
+                    }}
+                  >
+                    Primary (1–5)
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setClassType('secondary');
+                      setGrade(null);
+                      speak('Secondary class selected. Now choose grade 6 to 12.');
+                      playConfirmationTone();
+                    }}
+                    style={{
+                      ...styles.classTypeButton,
+                      ...(classType === 'secondary' ? styles.classTypeButtonActive : {}),
+                    }}
+                  >
+                    Secondary (6–12)
+                  </button>
+                </div>
+              </section>
+
+              {/* Grade selection based on class type (one shared selection, not per avatar) */}
+              {classType && (
+                <section aria-label="Select grade" style={styles.formGroup}>
+                  <h2 style={styles.sectionTitle}>
+                    {classType === 'primary' ? 'Select Grade (1–5)' : 'Select Grade (6–12)'}
+                  </h2>
+                  <div style={styles.gradeRow}>
+                    {(classType === 'primary' ? PRIMARY_GRADES : SECONDARY_GRADES).map((g) => (
+                      <button
+                        key={g}
+                        type="button"
+                        onClick={() => {
+                          setGrade(g);
+                          speak(`Grade ${g} selected.`);
+                          playConfirmationTone();
+                        }}
+                        style={{
+                          ...styles.gradeButton,
+                          ...(grade === g ? styles.gradeButtonActive : {}),
+                        }}
+                      >
+                        {g}
+                      </button>
+                    ))}
+                  </div>
+                </section>
+              )}
 
               {/* Parent email input */}
               <div style={styles.formGroup}>

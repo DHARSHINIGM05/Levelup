@@ -10,10 +10,17 @@ export default function Listening() {
   const level = registeredChild?.classType === 'primary' ? 'Primary' : 'Secondary';
   const [difficulty, setDifficulty] = useState(() => getModuleDifficulty('listening'));
 
-  const handleStart = () => {
+  const handleStart = (type) => {
     setModuleDifficulty('listening', difficulty);
-    navigate('/listening/play', { state: { difficulty } });
+  
+    navigate('/listening/play', {
+      state: {
+        difficulty,
+        testType: type   // ✅ send test type
+      }
+    });
   };
+  
 
   return (
     <div>
@@ -43,23 +50,34 @@ export default function Listening() {
           </button>
         ))}
       </div>
-      <button
-        type="button"
-        onClick={handleStart}
-        style={{
-          padding: '20px 40px',
-          borderRadius: 999,
-          border: 'none',
-          backgroundColor: '#2ECC71',
-          color: '#fff',
-          fontSize: '1.25rem',
-          fontWeight: 700,
-          cursor: 'pointer',
-          boxShadow: '0 10px 24px rgba(46,204,113,0.4)',
-        }}
-      >
+      <button onClick={() => handleStart("Pre-test")}>
+  Start Pre-test
+</button>
+
+<button onClick={() => handleStart("Practice")}>
+  Start Practice
+</button>
+
+<button
+  onClick={() => handleStart("Post-test")}
+  style={{
+    padding: '20px 40px',
+    borderRadius: 999,
+    border: 'none',
+    backgroundColor: '#2ECC71',
+    color: '#fff',
+    fontSize: '1.25rem',
+    fontWeight: 700,
+    cursor: 'pointer',
+    boxShadow: '0 10px 24px rgba(46,204,113,0.4)',
+  }}
+>
+  Start Post-test
+</button>
+
+      
         Start – Listen and act
-      </button>
+      
     </div>
   );
 }
