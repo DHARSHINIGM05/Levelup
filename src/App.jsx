@@ -13,7 +13,6 @@ import ReadingActivity from './pages/ReadingActivity';
 import Writing from './pages/Writing';
 import WritingActivity from './pages/WritingActivity';
 import Analytics from './pages/Analytics';
-import diagram from './components/diagram';
 
 
 function ProtectedLayout() {

@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useApp } from '../context/AppContext';
 import { getProgress } from '../utils/progress';
 import { getBadgeList, getRandomQuote } from '../utils/rewards';
-
+import Counter from '../components/Counter';
 const MODULE_COLORS = {
   listening: { bg: '#1e8449', hover: '#27AE60' },
   speaking: { bg: '#1a5276', hover: '#2980B9' },
@@ -34,6 +34,8 @@ export default function Home() {
   return (
     <div>
       <h1 style={{ fontSize: '2rem', marginBottom: 8, color: '#1a1a1a', fontWeight: 800 }}>Level Up Learning</h1>
+
+    <Counter/>
       {registeredChild && (
         <p style={{ fontSize: '1.1rem', color: '#333', marginBottom: 16, fontWeight: 700 }}>
           Hello {registeredChild.childName}! Choose a game to play.
