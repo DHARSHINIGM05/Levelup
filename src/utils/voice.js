@@ -1,6 +1,21 @@
 /**
  * Shared voice (TTS) and confirmation tone for GuideBot and inattentiveness alerts.
  */
+
+
+let sharedAudioCtx = null;
+function getAudioContext() {
+  if (!sharedAudioCtx) {
+    const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+    sharedAudioCtx = new AudioContextClass();
+  }
+  // Mobile browsers often suspend the context until a user gesture resumes it
+  if (sharedAudioCtx.state === 'suspended') {
+    sharedAudioCtx.resume();
+  }
+  return sharedAudioCtx;
+}
+
 export function speak(text) {
   if (!text) return;
   if (window.speechSynthesis?.speaking) {
@@ -15,8 +30,7 @@ export function speak(text) {
 
 export function playConfirmationTone() {
   try {
-    const AudioContext = window.AudioContext || window.webkitAudioContext;
-    const audioCtx = new AudioContext();
+    const audioCtx = getAudioContext();   // ← use the shared one, not `new AudioContext()`
     const oscillator = audioCtx.createOscillator();
     const gainNode = audioCtx.createGain();
     oscillator.type = 'sine';
@@ -25,9 +39,6 @@ export function playConfirmationTone() {
     oscillator.connect(gainNode);
     gainNode.connect(audioCtx.destination);
     oscillator.start();
-    setTimeout(() => {
-      oscillator.stop();
-      audioCtx.close();
-    }, 180);
+    oscillator.stop(audioCtx.currentTime + 0.18);   // ← no more setTimeout, no more audioCtx.close()
   } catch (_) {}
 }

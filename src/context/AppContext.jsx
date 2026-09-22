@@ -1,11 +1,18 @@
-import React, { createContext, useContext, useState, useCallback, useRef, useEffect } from 'react';
+import React, {
+  createContext,
+  useContext,
+  useState,
+  useCallback,
+  useRef,
+  useEffect,
+} from "react";
 
 const AppContext = createContext(null);
 
 export function AppProvider({ children }) {
   const [registeredChild, setRegisteredChild] = useState(() => {
     try {
-      const saved = localStorage.getItem('levelUpRegisteredChild');
+      const saved = localStorage.getItem("levelUpRegisteredChild");
       return saved ? JSON.parse(saved) : null;
     } catch {
       return null;
@@ -15,9 +22,9 @@ export function AppProvider({ children }) {
   const setRegisteredChildAndPersist = (child) => {
     setRegisteredChild(child);
     if (child) {
-      localStorage.setItem('levelUpRegisteredChild', JSON.stringify(child));
+      localStorage.setItem("levelUpRegisteredChild", JSON.stringify(child));
     } else {
-      localStorage.removeItem('levelUpRegisteredChild');
+      localStorage.removeItem("levelUpRegisteredChild");
     }
   };
 
@@ -68,6 +75,17 @@ export function AppProvider({ children }) {
     }));
   };
 
+  const MAX_CALM_ACTIVATIONS = 3;
+
+  const activateCalmMoment = () => {
+    if (sessionStats.calmModeActivatedCount >= MAX_CALM_ACTIVATIONS) {
+      return false; // limit reached — let the caller show a message if needed
+    }
+    setCalmMomentActive(true);
+    incrementCalmActivated();
+    return true;
+  };
+
   const endSession = useCallback(() => {
     const snapshot = { ...sessionStatsRef.current };
     setSessionStats({
@@ -88,6 +106,7 @@ export function AppProvider({ children }) {
         isLoggedIn,
         calmMomentActive,
         setCalmMomentActive,
+        activateCalmMoment,
         // session metrics
         sessionStats,
         startSession,
@@ -104,6 +123,6 @@ export function AppProvider({ children }) {
 
 export function useApp() {
   const ctx = useContext(AppContext);
-  if (!ctx) throw new Error('useApp must be used within AppProvider');
+  if (!ctx) throw new Error("useApp must be used within AppProvider");
   return ctx;
 }

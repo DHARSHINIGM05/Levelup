@@ -17,10 +17,16 @@ function ensureInit() {
  * Notify parent when inattentiveness is detected (used on Login and in Layout for learning pages).
  * Template must use: To = {{to_email}} (or your email service's "To" field), and {{childName}}, {{message}} in body.
  */
+/**
+ * Send a scheduled check-in notification to the parent (used on Login and in Layout for learning pages).
+ * Template must use: To = {{to_email}} (or your email service's "To" field), and {{childName}}, {{message}} in body.
+ */
 export async function notifyParentInattentive(parentEmail, childName) {
   if (!parentEmail || !parentEmail.includes('@')) return;
   ensureInit();
-  const message = childName ? `${childName} was not alert. Please check in.` : 'Your child was not alert. Please check in.';
+  const message = childName
+    ? `This is a scheduled check-in from Level Up Learning during ${childName}'s session.`
+    : 'This is a scheduled check-in from Level Up Learning during your child\'s session.';
   try {
     await emailjs.send(EMAILJS_SERVICE, EMAILJS_TEMPLATE_ID, {
       to_email: parentEmail,
@@ -30,6 +36,6 @@ export async function notifyParentInattentive(parentEmail, childName) {
     }, EMAILJS_PUBLIC_KEY);
   } catch (err) {
     console.error('Level Up Learning – email failed:', err?.text || err?.message || err);
-    console.error('Check: Service ID', EMAILJS_SERVICE, 'Template ID', EMAILJS_TEMPLATE, 'To:', parentEmail);
+    console.error('Check: Service ID', EMAILJS_SERVICE, 'Template ID', EMAILJS_TEMPLATE_ID, 'To:', parentEmail);
   }
 }
