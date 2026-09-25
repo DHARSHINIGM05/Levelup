@@ -4,6 +4,7 @@ import Navbar from "./Navbar";
 import { useApp } from "../context/AppContext";
 import { speak, playConfirmationTone } from "../utils/voice";
 import { notifyParentInattentive } from "../utils/notifyParent";
+import * as faceapi from "face-api.js";
 
 /** Novelty: Calm moment – child can pause and take a short, predictable break. */
 function CalmMomentOverlay({ onReady }) {
@@ -102,13 +103,22 @@ const pageInstructions = {
   "/writing/play": "Listen to the word and click the correct spelling.",
 };
 
-/* Camera: live feed only. Not recorded or stored (no MediaRecorder, no upload). */
-function CameraMonitor() {
+/* Camera: live feed only, plus face-presence detection for a real attentiveness signal.
+   Not recorded or stored (no MediaRecorder, no upload). */
+function CameraMonitor({ onFaceStatusChange }) {
   const videoRef = useRef(null);
+  const [modelsLoaded, setModelsLoaded] = useState(false);
+
   useEffect(() => {
     let stream;
+    let detectionInterval;
+    const missedChecksRef = { current: 0 };
+
     const start = async () => {
       try {
+        await faceapi.nets.tinyFaceDetector.loadFromUri("/models");
+        setModelsLoaded(true);
+
         stream = await navigator.mediaDevices.getUserMedia({
           video: { facingMode: "user" },
           audio: false,
@@ -117,13 +127,37 @@ function CameraMonitor() {
           videoRef.current.srcObject = stream;
           videoRef.current.play();
         }
+
+        detectionInterval = setInterval(async () => {
+          if (!videoRef.current) return;
+          const detection = await faceapi.detectSingleFace(
+            videoRef.current,
+            new faceapi.TinyFaceDetectorOptions(),
+          );
+
+          if (detection) {
+            missedChecksRef.current = 0;
+            onFaceStatusChange?.(true);
+          } else {
+            missedChecksRef.current += 1;
+            if (missedChecksRef.current >= 3) {
+              onFaceStatusChange?.(false);
+              missedChecksRef.current = 0;
+            }
+          }
+        }, 2000);
       } catch (e) {
-        console.error("Camera unavailable", e);
+        console.error("Camera or face detection unavailable", e);
       }
     };
     start();
-    return () => stream?.getTracks().forEach((t) => t.stop());
-  }, []);
+
+    return () => {
+      stream?.getTracks().forEach((t) => t.stop());
+      if (detectionInterval) clearInterval(detectionInterval);
+    };
+  }, [onFaceStatusChange]);
+
   return (
     <div style={styles.cameraPlaceholder}>
       <video
@@ -137,6 +171,11 @@ function CameraMonitor() {
         muted
         playsInline
       />
+      {!modelsLoaded && (
+        <p style={{ fontSize: "0.85rem", color: "#999", marginTop: 4 }}>
+          Loading face detection...
+        </p>
+      )}
     </div>
   );
 }
@@ -202,18 +241,22 @@ export default function Layout() {
   const location = useLocation();
   const path = location.pathname;
 
-  const handleInattentive = useCallback(() => {
-    speak("Quick check-in! Are you still with me?");
-    playConfirmationTone();
-    incrementInattentive();
-    const email = registeredChild?.parentEmail;
-    const name = registeredChild?.childName;
-    if (email && name) {
-      notifyParentInattentive(email, name).catch((err) =>
-        console.error("Inattentiveness email failed", err),
-      );
-    }
-  }, [registeredChild, incrementInattentive]);
+  const handleInattentive = useCallback(
+    (source = "unknown") => {
+      console.log(`Inattentive triggered by: ${source}`);
+      speak("Quick check-in! Are you still with me?");
+      playConfirmationTone();
+      incrementInattentive();
+      const email = registeredChild?.parentEmail;
+      const name = registeredChild?.childName;
+      if (email && name) {
+        notifyParentInattentive(email, name).catch((err) =>
+          console.error("Inattentiveness email failed", err),
+        );
+      }
+    },
+    [registeredChild, incrementInattentive],
+  );
 
   useEffect(() => {
     const instruction = pageInstructions[path] || pageInstructions["/home"];
@@ -223,7 +266,10 @@ export default function Layout() {
   useEffect(() => {
     if (!registeredChild || calmMomentActive) return;
     const intervalMs = 90 * 1000;
-    const id = setInterval(handleInattentive, intervalMs);
+    const id = setInterval(
+      () => handleInattentive("90-second timer"),
+      intervalMs,
+    );
     return () => clearInterval(id);
   }, [registeredChild, calmMomentActive, handleInattentive]);
 
@@ -242,6 +288,21 @@ export default function Layout() {
       "Let us take a calm moment. Breathe with the circle. When you are ready, tap I am ready.",
     );
   }, [setCalmMomentActive, incrementCalmActivated, sessionStats]);
+
+  // Face-presence detection: independent signal from the 90s timer, with a cooldown
+  const lastFaceAlertRef = useRef(0);
+  const FACE_ALERT_COOLDOWN_MS = 60 * 1000; // only alert once per 60 seconds max
+  const handleFaceStatusChange = useCallback(
+    (faceDetected) => {
+      if (!registeredChild || calmMomentActive) return;
+      if (faceDetected) return;
+      const now = Date.now();
+      if (now - lastFaceAlertRef.current < FACE_ALERT_COOLDOWN_MS) return;
+      lastFaceAlertRef.current = now;
+      handleInattentive("face-api.js (no face detected)");
+    },
+    [registeredChild, calmMomentActive, handleInattentive],
+  );
 
   return (
     <div style={styles.layout}>
@@ -265,7 +326,7 @@ export default function Layout() {
               Camera is on for focus only. It is not recorded. If you look away,
               your grown-up may get an email.
             </p>
-            <CameraMonitor />
+            <CameraMonitor onFaceStatusChange={handleFaceStatusChange} />
           </section>
           <section style={styles.cameraCard}>
             <h2 style={styles.sectionTitle}>Calm moment</h2>

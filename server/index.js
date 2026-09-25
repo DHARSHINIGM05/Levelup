@@ -1,59 +1,6 @@
 import express from 'express';
 import cors from 'cors';
-import db from './db.js';
-
-// ✅ INSERT DUMMY DATA FOR TESTING (runs only if DB empty)
-const existing = db.prepare("SELECT COUNT(*) AS count FROM test_results").get();
-
-if (existing.count === 0) {
-  console.log("Inserting dummy test data...");
-
-  const insert = db.prepare(`
-    INSERT INTO test_results (
-      learnerId, learnerName, moduleName, testType,
-      totalQuestions, correctAnswers, accuracy,
-      sessionDuration, calmModeActivatedCount,
-      calmModeResumedCount, inattentiveCount, isCompleted
-    )
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-  `);
-
-  const learnerId = "TestChild_class_5";
-
-  const dummyData = [
-    ["Listening", "Pre-test", 10, 6, 60, 12, 2, 2, 5],
-    ["Listening", "Post-test", 10, 8, 80, 10, 1, 1, 2],
-
-    ["Speaking", "Pre-test", 10, 6, 62, 13, 2, 2, 4],
-    ["Speaking", "Post-test", 10, 9, 88, 11, 1, 1, 1],
-
-    ["Reading", "Pre-test", 10, 6, 60, 14, 3, 2, 3],
-    ["Reading", "Post-test", 10, 8, 84, 12, 1, 1, 2],
-
-    ["Writing", "Pre-test", 10, 5, 55, 15, 3, 2, 4],
-    ["Writing", "Post-test", 10, 8, 80, 13, 2, 1, 2],
-  ];
-
-  for (const row of dummyData) {
-    insert.run(
-      learnerId,
-      "TestChild",
-      row[0],
-      row[1],
-      row[2],
-      row[3],
-      row[4],
-      row[5],
-      row[6],
-      row[7],
-      row[8],
-      1
-    );
-  }
-
-  console.log("Dummy data inserted successfully.");
-}
-
+import TestResult from './db.js';
 
 const app = express();
 const PORT = process.env.PORT || 4000;
@@ -68,8 +15,53 @@ function round2(value) {
   return Math.round(Number(value || 0) * 100) / 100;
 }
 
+// ✅ INSERT DUMMY DATA FOR TESTING (runs only if collection empty)
+async function insertDummyDataIfEmpty() {
+  const count = await TestResult.countDocuments();
+  if (count > 0) return;
+
+  console.log('Inserting dummy test data...');
+
+  const learnerId = 'TestChild_class_5';
+
+  const dummyData = [
+    ['Listening', 'Pre-test', 10, 6, 60, 12, 2, 2, 5],
+    ['Listening', 'Post-test', 10, 8, 80, 10, 1, 1, 2],
+
+    ['Speaking', 'Pre-test', 10, 6, 62, 13, 2, 2, 4],
+    ['Speaking', 'Post-test', 10, 9, 88, 11, 1, 1, 1],
+
+    ['Reading', 'Pre-test', 10, 6, 60, 14, 3, 2, 3],
+    ['Reading', 'Post-test', 10, 8, 84, 12, 1, 1, 2],
+
+    ['Writing', 'Pre-test', 10, 5, 55, 15, 3, 2, 4],
+    ['Writing', 'Post-test', 10, 8, 80, 13, 2, 1, 2],
+  ];
+
+  const docs = dummyData.map((row) => ({
+    learnerId,
+    learnerName: 'TestChild',
+    moduleName: row[0],
+    testType: row[1],
+    totalQuestions: row[2],
+    correctAnswers: row[3],
+    accuracy: row[4],
+    sessionDuration: row[5],
+    calmModeActivatedCount: row[6],
+    calmModeResumedCount: row[7],
+    inattentiveCount: row[8],
+    isCompleted: true,
+  }));
+
+  await TestResult.insertMany(docs);
+  console.log('Dummy data inserted successfully.');
+}
+
+insertDummyDataIfEmpty().catch((err) => console.error('Dummy data insert failed:', err));
+
 // 1️⃣ Save new test result
-app.post('/api/test-result', (req, res) => {
+// 1️⃣ Save new test result
+app.post('/api/test-result', async (req, res) => {
   try {
     const {
       learnerId,
@@ -97,47 +89,34 @@ app.post('/api/test-result', (req, res) => {
     }
 
     if (sessionKey) {
-      const existing = db
-        .prepare('SELECT id FROM test_results WHERE sessionKey = ?')
-        .get(sessionKey);
+      const existing = await TestResult.findOne({ sessionKey });
       if (existing) {
         return res.status(409).json({ error: 'Duplicate test result for this sessionKey.' });
       }
     }
 
     const accuracy = round2((correctAnswers / totalQuestions) * 100);
-    const durationMinutes = sessionDuration != null
-      ? round2(sessionDuration)
-      : null;
+    const durationMinutes = sessionDuration != null ? round2(sessionDuration) : null;
 
-    const stmt = db.prepare(`
-      INSERT INTO test_results
-        (learnerId, learnerName, moduleName, testType,
-         totalQuestions, correctAnswers, accuracy,
-         sessionDuration, calmModeActivatedCount, calmModeResumedCount,
-         inattentiveCount, isCompleted, sessionKey)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `);
-
-    const info = stmt.run(
-      String(learnerId),
-      learnerName || null,
-      String(moduleName),
-      String(testType),
-      Number(totalQuestions),
-      Number(correctAnswers),
+    const doc = {
+      learnerId: String(learnerId),
+      learnerName: learnerName || null,
+      moduleName: String(moduleName),
+      testType: String(testType),
+      totalQuestions: Number(totalQuestions),
+      correctAnswers: Number(correctAnswers),
       accuracy,
-      durationMinutes,
-      Number(calmModeActivatedCount) || 0,
-      Number(calmModeResumedCount) || 0,
-      Number(inattentiveCount) || 0,
-      isCompleted ? 1 : 0,
-      sessionKey,
-    );
+      sessionDuration: durationMinutes,
+      calmModeActivatedCount: Number(calmModeActivatedCount) || 0,
+      calmModeResumedCount: Number(calmModeResumedCount) || 0,
+      inattentiveCount: Number(inattentiveCount) || 0,
+      isCompleted: !!isCompleted,
+    };
+    if (sessionKey) {
+      doc.sessionKey = sessionKey;
+    }
 
-    const created = db
-      .prepare('SELECT * FROM test_results WHERE id = ?')
-      .get(info.lastInsertRowid);
+    const created = await TestResult.create(doc);
 
     return res.status(201).json(created);
   } catch (err) {
@@ -147,12 +126,10 @@ app.post('/api/test-result', (req, res) => {
 });
 
 // 2️⃣ Get all test records of a learner
-app.get('/api/test-result/:learnerId', (req, res) => {
+app.get('/api/test-result/:learnerId', async (req, res) => {
   try {
     const { learnerId } = req.params;
-    const rows = db
-      .prepare('SELECT * FROM test_results WHERE learnerId = ? ORDER BY timestamp ASC, id ASC')
-      .all(learnerId);
+    const rows = await TestResult.find({ learnerId }).sort({ timestamp: 1, _id: 1 });
     return res.json(rows);
   } catch (err) {
     console.error('GET /api/test-result/:learnerId error', err);
@@ -206,12 +183,10 @@ function computeModuleStats(rows) {
 }
 
 // 3️⃣ Analytics for a learner
-app.get('/api/analytics/:learnerId', (req, res) => {
+app.get('/api/analytics/:learnerId', async (req, res) => {
   try {
     const { learnerId } = req.params;
-    const rows = db
-      .prepare('SELECT * FROM test_results WHERE learnerId = ?')
-      .all(learnerId);
+    const rows = await TestResult.find({ learnerId });
 
     if (!rows.length) {
       return res.json({
@@ -285,9 +260,9 @@ app.get('/api/analytics/:learnerId', (req, res) => {
 });
 
 // 4️⃣ Admin study metrics
-app.get('/api/admin/study-metrics', (req, res) => {
+app.get('/api/admin/study-metrics', async (req, res) => {
   try {
-    const all = db.prepare('SELECT * FROM test_results').all();
+    const all = await TestResult.find({});
     if (!all.length) {
       return res.json({
         totalParticipants: 0,
@@ -305,19 +280,15 @@ app.get('/api/admin/study-metrics', (req, res) => {
       0,
     );
 
-    const { totalParticipants } = db
-      .prepare('SELECT COUNT(DISTINCT learnerId) AS totalParticipants FROM test_results')
-      .get();
+    const totalParticipants = new Set(all.map((r) => r.learnerId)).size;
 
-    const { minTs, maxTs } = db
-      .prepare('SELECT MIN(timestamp) AS minTs, MAX(timestamp) AS maxTs FROM test_results')
-      .get();
+    const timestamps = all.map((r) => new Date(r.timestamp).getTime());
+    const minTs = Math.min(...timestamps);
+    const maxTs = Math.max(...timestamps);
 
     let studyDurationInDays = 0;
     if (minTs && maxTs) {
-      const minDate = new Date(minTs);
-      const maxDate = new Date(maxTs);
-      studyDurationInDays = (maxDate - minDate) / (1000 * 60 * 60 * 24);
+      studyDurationInDays = (maxTs - minTs) / (1000 * 60 * 60 * 24);
     }
 
     const averageAccuracy = all.reduce((acc, r) => acc + (r.accuracy || 0), 0) / totalTestsConducted;
@@ -353,18 +324,17 @@ app.get('/api/admin/study-metrics', (req, res) => {
 app.get('/', (req, res) => {
   res.json({ status: 'ok', message: 'Level Up Learning analytics backend running.' });
 });
-app.get("/api/debug/all", async (req, res) => {
+
+app.get('/api/debug/all', async (req, res) => {
   try {
-    const rows = await db.all("SELECT * FROM test_results");
+    const rows = await TestResult.find({});
     res.json(rows);
   } catch (err) {
     console.error(err);
-    res.status(500).json({ error: "Failed to fetch data" });
+    res.status(500).json({ error: 'Failed to fetch data' });
   }
 });
-
 
 app.listen(PORT, () => {
   console.log(`Analytics API server listening on http://localhost:${PORT}`);
 });
-
