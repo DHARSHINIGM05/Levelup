@@ -177,7 +177,7 @@ export default function SpeakingActivity() {
     const durationMinutes = (Date.now() - started) / 60000;
     const learnerId = `${registeredChild.childName}_${registeredChild.grade}`;
 
-    fetch("http://localhost:4000/api/test-result", {
+    fetch("https://levelup-jpnn.onrender.com/api/test-result", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({

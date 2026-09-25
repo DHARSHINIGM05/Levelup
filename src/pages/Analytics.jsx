@@ -1,5 +1,5 @@
-import React, { useEffect, useState } from 'react';
-import { useApp } from '../context/AppContext';
+import React, { useEffect, useState } from "react";
+import { useApp } from "../context/AppContext";
 import {
   Chart as ChartJS,
   CategoryScale,
@@ -10,8 +10,8 @@ import {
   ArcElement,
   Tooltip,
   Legend,
-} from 'chart.js';
-import { Bar, Line, Pie } from 'react-chartjs-2';
+} from "chart.js";
+import { Bar, Line, Pie } from "react-chartjs-2";
 
 ChartJS.register(
   CategoryScale,
@@ -26,9 +26,9 @@ ChartJS.register(
 
 const cardStyle = {
   borderRadius: 24,
-  background: '#fff',
+  background: "#fff",
   padding: 24,
-  boxShadow: '0 10px 30px rgba(0,0,0,0.08)',
+  boxShadow: "0 10px 30px rgba(0,0,0,0.08)",
   marginBottom: 24,
 };
 
@@ -44,8 +44,8 @@ export default function Analytics() {
       setLoading(false);
       return;
     }
-    const learnerId = `${registeredChild.childName || 'child'}_class_${registeredChild.grade || 0}`;
-    const baseUrl = 'http://localhost:4000';
+    const learnerId = `${registeredChild.childName || "child"}_class_${registeredChild.grade || 0}`;
+    const baseUrl = "https://levelup-jpnn.onrender.com";
 
     async function load() {
       try {
@@ -54,8 +54,8 @@ export default function Analytics() {
           fetch(`${baseUrl}/api/analytics/${encodeURIComponent(learnerId)}`),
           fetch(`${baseUrl}/api/test-result/${encodeURIComponent(learnerId)}`),
         ]);
-        if (!analyticsRes.ok) throw new Error('Failed to load analytics');
-        if (!sessionsRes.ok) throw new Error('Failed to load sessions');
+        if (!analyticsRes.ok) throw new Error("Failed to load analytics");
+        if (!sessionsRes.ok) throw new Error("Failed to load sessions");
         const analyticsJson = await analyticsRes.json();
         const sessionsJson = await sessionsRes.json();
         setAnalytics(analyticsJson);
@@ -63,7 +63,7 @@ export default function Analytics() {
         setError(null);
       } catch (e) {
         console.error(e);
-        setError(e.message || 'Failed to load analytics');
+        setError(e.message || "Failed to load analytics");
       } finally {
         setLoading(false);
       }
@@ -91,16 +91,20 @@ export default function Analytics() {
   if (error) {
     return (
       <div style={cardStyle}>
-        <p style={{ color: '#E74C3C' }}>Error: {error}</p>
+        <p style={{ color: "#E74C3C" }}>Error: {error}</p>
       </div>
     );
   }
 
-  const moduleOrder = ['Listening', 'Speaking', 'Reading', 'Writing'];
+  const moduleOrder = ["Listening", "Speaking", "Reading", "Writing"];
   const moduleLabels = moduleOrder;
 
-  const preAcc = moduleOrder.map((m) => analytics.modules[m]?.averagePreAccuracy ?? 0);
-  const postAcc = moduleOrder.map((m) => analytics.modules[m]?.averagePostAccuracy ?? 0);
+  const preAcc = moduleOrder.map(
+    (m) => analytics.modules[m]?.averagePreAccuracy ?? 0,
+  );
+  const postAcc = moduleOrder.map(
+    (m) => analytics.modules[m]?.averagePostAccuracy ?? 0,
+  );
 
   const lineLabels = sessions.map((s, idx) => `${idx + 1}`);
   const lineData = sessions.map((s) => s.accuracy);
@@ -112,14 +116,18 @@ export default function Analytics() {
 
   return (
     <div>
-      <h2 style={{ fontSize: '1.8rem', marginBottom: 16 }}>Learner Analytics</h2>
+      <h2 style={{ fontSize: "1.8rem", marginBottom: 16 }}>
+        Learner Analytics
+      </h2>
       <p style={{ marginBottom: 24 }}>
-        {registeredChild.childName} – class {registeredChild.classType === 'primary' ? 'Primary' : 'Secondary'} {registeredChild.grade}
+        {registeredChild.childName} – class{" "}
+        {registeredChild.classType === "primary" ? "Primary" : "Secondary"}{" "}
+        {registeredChild.grade}
       </p>
 
       <section style={cardStyle}>
         <h3 style={{ marginBottom: 16 }}>Key Metrics</h3>
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 16 }}>
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 16 }}>
           <div style={{ minWidth: 160 }}>
             <strong>Average session duration</strong>
             <p>{analytics.averageSessionDuration.toFixed(2)} min</p>
@@ -148,20 +156,22 @@ export default function Analytics() {
       </section>
 
       <section style={cardStyle}>
-        <h3 style={{ marginBottom: 16 }}>Pre-test vs Post-test Accuracy per Module</h3>
+        <h3 style={{ marginBottom: 16 }}>
+          Pre-test vs Post-test Accuracy per Module
+        </h3>
         <Bar
           data={{
             labels: moduleLabels,
             datasets: [
               {
-                label: 'Pre-test',
+                label: "Pre-test",
                 data: preAcc,
-                backgroundColor: '#1F4E79',
+                backgroundColor: "#1F4E79",
               },
               {
-                label: 'Post-test',
+                label: "Post-test",
                 data: postAcc,
-                backgroundColor: '#1E8449',
+                backgroundColor: "#1E8449",
               },
             ],
           }}
@@ -175,16 +185,18 @@ export default function Analytics() {
       </section>
 
       <section style={cardStyle}>
-        <h3 style={{ marginBottom: 16 }}>Accuracy Progression Across Sessions</h3>
+        <h3 style={{ marginBottom: 16 }}>
+          Accuracy Progression Across Sessions
+        </h3>
         <Line
           data={{
             labels: lineLabels,
             datasets: [
               {
-                label: 'Accuracy (%)',
+                label: "Accuracy (%)",
                 data: lineData,
-                borderColor: '#145A32',
-                backgroundColor: 'rgba(20, 90, 50, 0.25)',
+                borderColor: "#145A32",
+                backgroundColor: "rgba(20, 90, 50, 0.25)",
               },
             ],
           }}
@@ -204,9 +216,9 @@ export default function Analytics() {
             labels: lineLabels,
             datasets: [
               {
-                label: 'Inattentive count',
+                label: "Inattentive count",
                 data: inattentivePerSession,
-                backgroundColor: '#922B21',
+                backgroundColor: "#922B21",
               },
             ],
           }}
@@ -221,9 +233,9 @@ export default function Analytics() {
             labels: lineLabels,
             datasets: [
               {
-                label: 'Calm mode activations',
+                label: "Calm mode activations",
                 data: calmPerSession,
-                backgroundColor: '#B9770E',
+                backgroundColor: "#B9770E",
               },
             ],
           }}
@@ -235,11 +247,11 @@ export default function Analytics() {
         <h3 style={{ marginBottom: 16 }}>Engagement Rate</h3>
         <Pie
           data={{
-            labels: ['Completed sessions', 'Abandoned sessions'],
+            labels: ["Completed sessions", "Abandoned sessions"],
             datasets: [
               {
                 data: [completed, abandoned],
-                backgroundColor: ['#2ECC71', '#E74C3C'],
+                backgroundColor: ["#2ECC71", "#E74C3C"],
               },
             ],
           }}

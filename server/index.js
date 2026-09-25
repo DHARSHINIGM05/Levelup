@@ -6,7 +6,11 @@ const app = express();
 const PORT = process.env.PORT || 4000;
 
 app.use(cors({
-  origin: ['http://localhost:5173', 'http://127.0.0.1:5173'],
+  origin: [
+    'http://localhost:5173',
+    'http://127.0.0.1:5173',
+    'https://levelup-learning-chi.vercel.app',
+  ],
   methods: ['GET', 'POST'],
 }));
 app.use(express.json());
@@ -59,7 +63,6 @@ async function insertDummyDataIfEmpty() {
 
 insertDummyDataIfEmpty().catch((err) => console.error('Dummy data insert failed:', err));
 
-// 1️⃣ Save new test result
 // 1️⃣ Save new test result
 app.post('/api/test-result', async (req, res) => {
   try {

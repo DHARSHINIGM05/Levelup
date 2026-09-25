@@ -121,7 +121,7 @@ export default function WritingActivity() {
       : "unknown";
 
     if (total > 0) {
-      fetch("http://localhost:4000/api/test-result", {
+      fetch("https://levelup-jpnn.onrender.com/api/test-result", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
